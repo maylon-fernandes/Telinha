@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compartilhar Tela</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="screen-wrapper" class="screen hidden">
+      <video id="screen-video" autoplay playsinline muted></video>
+      <div id="live-badge" class="live-badge hidden">
+        <span class="dot"></span> AO VIVO <span id="badge-timer">00:00</span>
+      </div>
+      <div id="viewer-controls" class="viewer-controls hidden">
+        <div id="viewer-status" class="viewer-status-label hidden">
+          <span class="spinner"></span> Conectando...
+        </div>
+        <div class="ctrl-buttons">
+          <button id="volume-btn" class="ctrl-btn" title="Ativar/desativar som">🔊</button>
+          <input
+            id="volume-slider"
+            type="range"
+            min="0"
+            max="100"
+            value="90"
+            class="volume-slider"
+            aria-label="Volume da transmissão"
+          />
+          <button id="fullscreen-btn" class="ctrl-btn" title="Tela cheia">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+              <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+              <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+              <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+            </svg>
+          </button>
+          <button id="leave-btn" class="ctrl-btn leave" title="Desconectar" aria-label="Desconectar">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="ui">
+      <div class="panel" id="broadcaster-panel">
+        <div class="brand">
+          <div class="brand-icon">🖥️</div>
+          <h1>Compartilhar Tela</h1>
+        </div>
+        <p class="subtitle">Transmissão ao vivo em Full HD (1080p) a 60 fps, com áudio.</p>
+
+        <div class="btn-group">
+          <button id="start-share-btn" class="btn primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5.5v13a1 1 0 0 0 1.5.87l11-6.5a1 1 0 0 0 0-1.74l-11-6.5A1 1 0 0 0 8 5.5Z" />
+            </svg>
+            Compartilhar Tela
+          </button>
+          <button id="stop-share-btn" class="btn danger hidden">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="5" y="5" width="14" height="14" rx="2.5" />
+            </svg>
+            Parar
+          </button>
+        </div>
+
+        <div id="share-status" class="status hidden">
+          <p class="status-title">Link para os espectadores</p>
+          <div class="link-row">
+            <input id="share-link" type="text" readonly />
+            <button id="copy-link-btn" class="btn ghost">Copiar</button>
+          </div>
+          <p class="popup-timer">⏱ Tempo de transmissão: <span id="timer">00:00</span></p>
+        </div>
+
+        <div id="broadcaster-stats" class="stats"></div>
+        <div id="viewer-count" class="count hidden"></div>
+        <p class="hint" id="b-hint">
+          O link gerado pode ser compartilhado com quantas pessoas quiser. Todos os
+          dispositivos precisam alcançar este servidor para assistir.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div id="share-popup" class="popup-overlay hidden">
+    <div class="popup">
+      <div class="popup-icon">🖥️</div>
+      <h2>Sua tela está sendo transmitida</h2>
+      <p class="subtitle">Outras pessoas já podem assistir pelo link abaixo.</p>
+      <div class="link-row">
+        <input id="popup-link" type="text" readonly />
+        <button id="popup-copy-btn" class="btn ghost">Copiar</button>
+      </div>
+      <p class="popup-timer">⏱ Tempo de transmissão: <span id="popup-timer">00:00</span></p>
+      <div class="popup-actions">
+        <button id="popup-ok-btn" class="btn primary">Entendi</button>
+        <button id="popup-stop-btn" class="btn danger">Parar transmissão</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

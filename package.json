@@ -1,0 +1,13 @@
+{
+  "name": "screen-share",
+  "version": "1.0.0",
+  "description": "Compartilhamento de tela Full HD 60fps via WebRTC",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}
