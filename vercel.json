@@ -2,7 +2,6 @@
   "version": 2,
   "functions": {
     "api/ws.js": {
-      "websocket": true,
       "maxDuration": 60
     }
   }
