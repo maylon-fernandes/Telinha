@@ -32,7 +32,8 @@
   const popupStopBtn = $("popup-stop-btn");
   const timerEls = [$("popup-timer"), $("badge-timer"), $("timer")];
 
-  const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
+  const wsUrl =
+  (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/ws";
 
   const ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" },
@@ -77,6 +78,7 @@
   let statsTimer = null;
   let shareStartTime = 0;
   let timerInterval = null;
+  let sigReady = false;
 
   let viewerWS = null;
   let viewerPC = null;
@@ -178,14 +180,27 @@
       t.addEventListener("ended", () => stopSharing())
     );
 
-    try {
-      broadcastWS = await openWS();
-    } catch (err) {
-      alert("Não foi possível gerar o link de acesso.");
-      stopSharing();
-      return;
-    }
+    connectBroadcastSignaling(0);
+  }
 
+  function connectBroadcastSignaling(retry) {
+    openWS()
+      .then((ws) => {
+        broadcastWS = ws;
+        setupBroadcastSignaling();
+      })
+      .catch(() => {
+        if (!displayStream) return;
+        if (retry >= 15) {
+          bHint.textContent = "Sem conexão com o servidor de sinalização.";
+          return;
+        }
+        bHint.textContent = "Conectando ao servidor...";
+        setTimeout(() => connectBroadcastSignaling(retry + 1), 2500);
+      });
+  }
+
+  function setupBroadcastSignaling() {
     broadcastWS.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       switch (msg.type) {
@@ -194,14 +209,19 @@
           const link = location.origin + "/view?join=" + sessionId;
           linkInput.value = link;
           popupLink.value = link;
-          statusEl.classList.remove("hidden");
-          badge.classList.remove("hidden");
-          popup.classList.remove("hidden");
-          viewerCountEl.classList.remove("hidden");
-          updateViewerCount(0);
-          startTimer();
+          if (!sigReady) {
+            statusEl.classList.remove("hidden");
+            badge.classList.remove("hidden");
+            popup.classList.remove("hidden");
+            viewerCountEl.classList.remove("hidden");
+            updateViewerCount(0);
+            startTimer();
+            startStats();
+            sigReady = true;
+          } else {
+            bHint.textContent = "Sinal restabelecido. Transmissão no ar.";
+          }
           send(broadcastWS, { type: "share-ready" });
-          startStats();
           break;
         case "viewer-count":
           updateViewerCount(msg.count);
@@ -240,9 +260,20 @@
       }
     };
 
-    broadcastWS.onclose = () => stopSharing();
+    broadcastWS.onclose = () => {
+      broadcastWS = null;
+      if (displayStream) {
+        bHint.textContent = "Sinal do servidor perdido. Reconectando...";
+        connectBroadcastSignaling(0);
+      }
+    };
+    broadcastWS.onerror = () => {
+      try {
+        broadcastWS.close();
+      } catch (e) {}
+    };
 
-    send(broadcastWS, { type: "join", role: "broadcaster" });
+    send(broadcastWS, { type: "join", role: "broadcaster", id: sessionId || undefined });
   }
 
   async function createViewerPC(viewerId) {
@@ -315,6 +346,7 @@
     viewerCountEl.classList.add("hidden");
     viewerCountEl.textContent = "";
     sessionId = null;
+    sigReady = false;
     bHint.textContent =
       "O link gerado é compartilhado com quem quiser ver sua tela. Todos os dispositivos precisam alcançar este servidor.";
   }
