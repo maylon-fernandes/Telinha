@@ -4,5 +4,9 @@
     "api/ws.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/view", "destination": "/index.html" },
+    { "source": "/", "destination": "/index.html" }
+  ]
 }
