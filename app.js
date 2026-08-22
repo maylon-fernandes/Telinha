@@ -32,12 +32,19 @@
   const popupStopBtn = $("popup-stop-btn");
   const timerEls = [$("popup-timer"), $("badge-timer"), $("timer")];
 
+  const configPopup = $("config-popup");
+  const configConfirm = $("config-confirm");
+  const configCancel = $("config-cancel");
+
   const wsUrl =
   (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/ws";
 
   const ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
     {
       urls: "turn:openrelay.metered.ca:80?transport=udp",
       username: "openrelayproject",
@@ -49,6 +56,73 @@
       credential: "openrelayproject",
     },
   ];
+
+  /* ================= CONFIG ================= */
+
+  let shareConfig = { quality: "1080", fps: "30" };
+
+  function getConfigBitrate() {
+    const map = { "1080": 8000000, "720": 4000000, "480": 1500000 };
+    return map[shareConfig.quality] || 8000000;
+  }
+
+  function getConfigFps() {
+    return parseInt(shareConfig.fps, 10) || 30;
+  }
+
+  function getConfigHeight() {
+    const map = { "1080": 1080, "720": 720, "480": 480 };
+    return map[shareConfig.quality] || 1080;
+  }
+
+  function getConfigWidth() {
+    const h = getConfigHeight();
+    return Math.round(h * (16 / 9));
+  }
+
+  function getScale() {
+    const map = { "1080": 1.0, "720": 720 / 1080, "480": 480 / 1080 };
+    return map[shareConfig.quality] || 1.0;
+  }
+
+  /* Config popup option clicks */
+  document.querySelectorAll(".option").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      const value = btn.dataset.value;
+      shareConfig[key] = value;
+      document.querySelectorAll(`.option[data-key="${key}"]`).forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  });
+
+  configConfirm.addEventListener("click", () => {
+    configPopup.classList.add("hidden");
+    doStartSharing();
+  });
+
+  configCancel.addEventListener("click", () => {
+    configPopup.classList.add("hidden");
+  });
+
+  configPopup.addEventListener("click", (e) => {
+    if (e.target === configPopup) configPopup.classList.add("hidden");
+  });
+
+  /* ================= QUALITY ADAPTIVE ================= */
+
+  const QualityProfile = {
+    ULTRA: { maxBitrate: 8000000, maxFps: 60, scale: 1.0, label: "Ultra (1080p60)" },
+    HIGH:  { maxBitrate: 5000000, maxFps: 30, scale: 1.0, label: "Alta (1080p30)" },
+    MEDIUM:{ maxBitrate: 2500000, maxFps: 30, scale: 0.75, label: "Média (720p30)" },
+    LOW:   { maxBitrate: 1200000, maxFps: 24, scale: 0.5, label: "Baixa (480p24)" },
+    MIN:   { maxBitrate: 600000,  maxFps: 15, scale: 0.35, label: "Mínima (360p15)" },
+  };
+
+  let currentProfile = QualityProfile.ULTRA;
+  let qualityStats = { packetsLost: 0, rtt: 0, bandwidth: 0, framesDropped: 0 };
+  let profileHistory = [];
+  let broadcastWSRef = null;
 
   function makePC() {
     return new RTCPeerConnection({ iceServers: ICE_SERVERS });
@@ -87,6 +161,7 @@
   let viewerEnded = false;
   let reconnectTimer = null;
   let errorFired = false;
+  let backoffDelay = 2500;
 
   function fmtTime(ms) {
     const s = Math.floor(ms / 1000);
@@ -118,15 +193,15 @@
   }
 
   if (!isViewer) {
-    startBtn.addEventListener("click", startSharing);
+    startBtn.addEventListener("click", () => {
+      configPopup.classList.remove("hidden");
+    });
     stopBtn.addEventListener("click", stopSharing);
     copyBtn.addEventListener("click", () => {
       linkInput.select();
-      try {
-        navigator.clipboard.writeText(linkInput.value);
-      } catch (e) {}
-      copyBtn.textContent = "Copiado!";
-      setTimeout(() => (copyBtn.textContent = "Copiar"), 1500);
+      try { navigator.clipboard.writeText(linkInput.value); } catch (e) {}
+      copyBtn.textContent = "COPIED!";
+      setTimeout(() => (copyBtn.textContent = "COPY"), 1500);
     });
 
     popupOkBtn.addEventListener("click", () => popup.classList.add("hidden"));
@@ -136,11 +211,9 @@
     });
     popupCopyBtn.addEventListener("click", () => {
       popupLink.select();
-      try {
-        navigator.clipboard.writeText(popupLink.value);
-      } catch (e) {}
-      popupCopyBtn.textContent = "Copiado!";
-      setTimeout(() => (popupCopyBtn.textContent = "Copiar"), 1500);
+      try { navigator.clipboard.writeText(popupLink.value); } catch (e) {}
+      popupCopyBtn.textContent = "COPIED!";
+      setTimeout(() => (popupCopyBtn.textContent = "COPY"), 1500);
     });
 
     window.addEventListener("beforeunload", (e) => {
@@ -153,20 +226,27 @@
     initViewer();
   }
 
-  async function startSharing() {
+  async function doStartSharing() {
     try {
-      displayStream = await navigator.mediaDevices.getDisplayMedia({
+      const constraints = {
         video: {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 60, max: 60 },
+          width: { ideal: getConfigWidth(), max: getConfigWidth() },
+          height: { ideal: getConfigHeight(), max: getConfigHeight() },
+          frameRate: { ideal: getConfigFps(), max: getConfigFps() },
         },
         audio: true,
-      });
+      };
+      displayStream = await navigator.mediaDevices.getDisplayMedia(constraints);
     } catch (err) {
-      alert("Captura de tela cancelada ou não permitida pelo navegador.");
       return;
     }
+
+    currentProfile = {
+      maxBitrate: getConfigBitrate(),
+      maxFps: getConfigFps(),
+      scale: getScale(),
+      label: `${shareConfig.quality}p${shareConfig.fps}`,
+    };
 
     startBtn.classList.add("hidden");
     stopBtn.classList.remove("hidden");
@@ -174,7 +254,7 @@
     video.muted = true;
     wrapper.classList.remove("hidden");
     appEl.classList.add("sharing");
-    bHint.textContent = "Transmissão ao vivo. Compartilhe o link com quem quiser ver sua tela.";
+    bHint.textContent = "ao vivo. compartilhe o link.";
 
     displayStream.getTracks().forEach((t) =>
       t.addEventListener("ended", () => stopSharing())
@@ -192,10 +272,10 @@
       .catch(() => {
         if (!displayStream) return;
         if (retry >= 15) {
-          bHint.textContent = "Sem conexão com o servidor de sinalização.";
+          bHint.textContent = "sem conexão com o servidor.";
           return;
         }
-        bHint.textContent = "Conectando ao servidor...";
+        bHint.textContent = "conectando...";
         setTimeout(() => connectBroadcastSignaling(retry + 1), 2500);
       });
   }
@@ -219,7 +299,7 @@
             startStats();
             sigReady = true;
           } else {
-            bHint.textContent = "Sinal restabelecido. Transmissão no ar.";
+            bHint.textContent = "reconectado.";
           }
           send(broadcastWS, { type: "share-ready" });
           break;
@@ -228,6 +308,7 @@
           break;
         case "viewer-arrived":
           createViewerPC(msg.viewerId);
+          send(broadcastWS, { type: "broadcast-start", viewerId: msg.viewerId, startTime: shareStartTime });
           break;
         case "answer": {
           const pc = viewerPCs.get(msg.viewerId);
@@ -263,14 +344,12 @@
     broadcastWS.onclose = () => {
       broadcastWS = null;
       if (displayStream) {
-        bHint.textContent = "Sinal do servidor perdido. Reconectando...";
+        bHint.textContent = "reconectando ao servidor...";
         connectBroadcastSignaling(0);
       }
     };
     broadcastWS.onerror = () => {
-      try {
-        broadcastWS.close();
-      } catch (e) {}
+      try { broadcastWS.close(); } catch (e) {}
     };
 
     send(broadcastWS, { type: "join", role: "broadcaster", id: sessionId || undefined });
@@ -289,10 +368,11 @@
     for (const s of pc.getSenders()) {
       if (s.track && s.track.kind === "video") {
         const p = s.getParameters();
-        if (p.encodings && p.encodings.length) {
-          p.encodings[0].maxBitrate = 8000000;
-          p.encodings[0].maxFramerate = 60;
-        }
+        if (!p.encodings || p.encodings.length === 0) p.encodings = [{}];
+        p.encodings[0].maxBitrate = currentProfile.maxBitrate;
+        p.encodings[0].maxFramerate = currentProfile.maxFps;
+        p.encodings[0].scaleResolutionDownBy = currentProfile.scale > 0 ? (1 / currentProfile.scale) : 1;
+        p.encodings[0].networkPriority = "high";
         s.setParameters(p).catch(() => {});
       }
     }
@@ -313,7 +393,7 @@
   function updateViewerCount(n) {
     if (!viewerCountEl) return;
     viewerCountEl.textContent =
-      "👁 " + n + (n === 1 ? " pessoa assistindo" : " pessoas assistindo");
+      n + (n === 1 ? " viewer" : " viewers");
   }
 
   function stopSharing() {
@@ -347,30 +427,96 @@
     viewerCountEl.textContent = "";
     sessionId = null;
     sigReady = false;
-    bHint.textContent =
-      "O link gerado é compartilhado com quem quiser ver sua tela. Todos os dispositivos precisam alcançar este servidor.";
+    currentProfile = QualityProfile.ULTRA;
+    qualityStats = { packetsLost: 0, rtt: 0, bandwidth: 0, framesDropped: 0 };
+    profileHistory = [];
+    bHint.textContent = "clique em iniciar para compartilhar sua tela.";
   }
 
   function startStats() {
-    bStats.textContent = "Aguardando espectadores...";
+    bStats.textContent = "aguardando viewers...";
     statsTimer = setInterval(async () => {
       const pc = [...viewerPCs.values()][0];
       if (!pc) return;
       try {
         const stats = await pc.getStats();
+        let outbound = null;
+        let remoteInbound = null;
+
         for (const s of stats.values()) {
-          if (
-            (s.type === "outbound-rtp" || s.type === "remote-inbound-rtp") &&
-            s.kind === "video"
-          ) {
-            bStats.textContent =
-              `Enviando ${s.frameWidth || "?"}x${s.frameHeight || "?"} ` +
-              `@ ${s.framesPerSecond || 0} fps`;
-            break;
+          if (s.type === "outbound-rtp" && s.kind === "video") outbound = s;
+          if (s.type === "remote-inbound-rtp" && s.kind === "video") remoteInbound = s;
+        }
+
+        if (outbound) {
+          qualityStats.packetsLost = outbound.packetsLost || 0;
+          qualityStats.framesDropped = outbound.framesDropped || 0;
+          qualityStats.bandwidth = outbound.bytesSent || 0;
+
+          if (remoteInbound) {
+            qualityStats.rtt = remoteInbound.roundTripTime || 0;
           }
+
+          const resolution = `${outbound.frameWidth || "?"}x${outbound.frameHeight || "?"}`;
+          const fps = outbound.framesPerSecond || 0;
+          const quality = getConnectionQuality();
+
+          bStats.innerHTML =
+            `${resolution} @ ${fps}fps` +
+            ` <span style="color:${quality.color}">${quality.label}</span>`;
+
+          adaptQuality(qualityStats, [...viewerPCs.values()]);
         }
       } catch (e) {}
-    }, 2000);
+    }, 1500);
+  }
+
+  function getConnectionQuality() {
+    const { rtt, packetsLost } = qualityStats;
+    if (rtt < 0.05 && packetsLost < 10) return { level: 3, label: "ok", color: "#00ff66" };
+    if (rtt < 0.15 && packetsLost < 50) return { level: 2, label: "ok", color: "#3399ff" };
+    if (rtt < 0.30 && packetsLost < 200) return { level: 1, label: "instavel", color: "#ff9900" };
+    return { level: 0, label: "ruim", color: "#ff3333" };
+  }
+
+  function adaptQuality(stats, pcs) {
+    const profiles = [QualityProfile.MIN, QualityProfile.LOW, QualityProfile.MEDIUM, QualityProfile.HIGH, QualityProfile.ULTRA];
+    const currentIdx = profiles.indexOf(currentProfile);
+
+    let targetIdx = currentIdx;
+    const { rtt, packetsLost } = stats;
+
+    if (rtt > 0.30 || packetsLost > 200) {
+      targetIdx = Math.max(0, currentIdx - 2);
+    } else if (rtt > 0.15 || packetsLost > 50) {
+      targetIdx = Math.max(0, currentIdx - 1);
+    } else if (rtt < 0.05 && packetsLost < 10 && currentIdx < profiles.length - 1) {
+      targetIdx = Math.min(profiles.length - 1, currentIdx + 1);
+    }
+
+    if (targetIdx !== currentIdx) {
+      profileHistory.push({ from: currentProfile.label, to: profiles[targetIdx].label, time: Date.now() });
+      if (profileHistory.length > 20) profileHistory.shift();
+      currentProfile = profiles[targetIdx];
+      applyQualityToAll(pcs);
+    }
+  }
+
+  function applyQualityToAll(pcs) {
+    for (const pc of pcs) {
+      for (const sender of pc.getSenders()) {
+        if (sender.track && sender.track.kind === "video") {
+          const params = sender.getParameters();
+          if (!params.encodings || params.encodings.length === 0) {
+            params.encodings = [{}];
+          }
+          params.encodings[0].maxBitrate = currentProfile.maxBitrate;
+          params.encodings[0].maxFramerate = currentProfile.maxFps;
+          params.encodings[0].scaleResolutionDownBy = currentProfile.scale > 0 ? (1 / currentProfile.scale) : 1;
+          sender.setParameters(params).catch(() => {});
+        }
+      }
+    }
   }
 
   /* ================= ESPECTADOR ================= */
@@ -386,6 +532,7 @@
   }
 
   let ctrlTimer = null;
+  let viewerStatsTimer = null;
 
   function kickControls() {
     if (viewerEnded) return;
@@ -393,6 +540,39 @@
     if (ctrlTimer) clearTimeout(ctrlTimer);
     if (!video.srcObject) return;
     ctrlTimer = setTimeout(() => ctrlBar.classList.add("idle"), 3000);
+  }
+
+  function startViewerStats() {
+    if (viewerStatsTimer) clearInterval(viewerStatsTimer);
+    viewerStatsTimer = setInterval(async () => {
+      if (!viewerPC || viewerEnded) return;
+      try {
+        const stats = await viewerPC.getStats();
+        let inbound = null;
+        for (const s of stats.values()) {
+          if (s.type === "inbound-rtp" && s.kind === "video") { inbound = s; break; }
+        }
+        if (inbound) {
+          const fps = inbound.framesPerSecond || 0;
+          const w = inbound.frameWidth || 0;
+          const h = inbound.frameHeight || 0;
+          const loss = inbound.packetsLost || 0;
+          const jitter = (inbound.jitter || 0) * 1000;
+          let color = "#00ff66";
+          if (jitter > 50 || loss > 100) color = "#ff3333";
+          else if (jitter > 20 || loss > 20) color = "#ff9900";
+          if (w && h) {
+            vStatus.textContent = `${w}x${h} ${fps}fps`;
+            vStatus.classList.remove("hidden");
+            vStatus.style.color = color;
+          }
+        }
+      } catch (e) {}
+    }, 2000);
+  }
+
+  function stopViewerStats() {
+    if (viewerStatsTimer) { clearInterval(viewerStatsTimer); viewerStatsTimer = null; }
   }
 
   function initViewer() {
@@ -432,7 +612,7 @@
       else wrapper.requestFullscreen().catch(() => {});
     });
     leaveBtn.addEventListener("click", () => {
-      endViewer("Desconectado.");
+      endViewer("desconectado.");
       location.href = "/";
     });
     connectViewer();
@@ -452,7 +632,7 @@
     if (viewerEnded) return;
     attempts++;
     if (attempts > 30) {
-      endViewer("Não foi possível conectar à transmissão.");
+      endViewer("falha na conexão.");
       return;
     }
     vStatus.textContent = msg;
@@ -460,10 +640,13 @@
     ctrlBar.classList.remove("idle");
     closeViewerWS();
     if (reconnectTimer) clearTimeout(reconnectTimer);
+    const jitter = Math.random() * 1000;
+    const delay = Math.min(backoffDelay * Math.pow(1.5, attempts - 1) + jitter, 30000);
+    vStatus.textContent = `${msg} (${Math.round(delay / 1000)}s)`;
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connectViewer();
-    }, 2500);
+    }, delay);
   }
 
   function connectViewer() {
@@ -473,7 +656,7 @@
     try {
       viewerWS = new WebSocket(wsUrl);
     } catch (e) {
-      scheduleReconnect("Erro de conexão.");
+      scheduleReconnect("erro de conexão.");
       return;
     }
 
@@ -483,7 +666,9 @@
       const msg = JSON.parse(e.data);
       switch (msg.type) {
         case "joined":
-          vStatus.textContent = "Conectando ao transmissor...";
+          vStatus.textContent = "conectando...";
+          backoffDelay = 2500;
+          attempts = 0;
           viewerPC = makePC();
           try {
             viewerPC.addTransceiver("video", { direction: "recvonly" });
@@ -493,7 +678,7 @@
             const st = viewerPC.connectionState;
             if (st === "failed" || st === "disconnected") {
               vStatus.classList.remove("hidden");
-              vStatus.textContent = "Sem conexão com o transmissor.";
+              vStatus.textContent = "sem conexão.";
             }
           };
           viewerPC.onicecandidate = (ev) => {
@@ -511,6 +696,7 @@
               setVolumeFill();
               updateVolumeIcon();
               kickControls();
+              startViewerStats();
             }
           };
           break;
@@ -526,7 +712,7 @@
             await viewerPC.setLocalDescription(answer);
             send(viewerWS, { type: "answer", joinId, sdp: viewerPC.localDescription });
           })().catch((err) => {
-            vStatus.textContent = "Erro: " + err.message;
+            vStatus.textContent = "erro: " + err.message;
           });
           break;
 
@@ -539,28 +725,39 @@
           break;
 
         case "broadcaster-left":
-          endViewer("Transmissão encerrada.");
+          endViewer("transmissão encerrada.");
+          break;
+
+        case "broadcast-start":
+          if (msg.startTime) {
+            shareStartTime = msg.startTime;
+            updateTimerEls();
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimerEls, 1000);
+          }
           break;
 
         case "error":
-          scheduleReconnect("O transmissor ainda não iniciou. Reconectando...");
+          scheduleReconnect("aguardando transmissor...");
           break;
       }
     };
 
     viewerWS.onerror = () => {
       errorFired = true;
-      scheduleReconnect("Erro de conexão. Reconectando...");
+      scheduleReconnect("erro de conexão.");
     };
 
     viewerWS.onclose = () => {
-      if (!errorFired && !viewerEnded) scheduleReconnect("Conexão perdida. Reconectando...");
+      if (!errorFired && !viewerEnded) scheduleReconnect("conexão perdida.");
     };
   }
 
   function endViewer(msg) {
     if (viewerEnded) return;
     viewerEnded = true;
+    stopViewerStats();
+    resetTimer();
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
