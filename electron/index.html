@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com; connect-src *; media-src *; img-src * data:;" />
+  <title>ScreenShare</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+<body>
+
+  <!-- ==================== TITLE BAR ==================== -->
+  <div id="titlebar">
+    <div class="titlebar-drag">
+      <span class="titlebar-title">telinha</span>
+    </div>
+    <div class="titlebar-controls">
+      <button id="btn-minimize" class="titlebar-btn" title="Minimizar">
+        <svg width="12" height="12" viewBox="0 0 12 12"><rect x="1" y="5.5" width="10" height="1" fill="currentColor"/></svg>
+      </button>
+      <button id="btn-maximize" class="titlebar-btn" title="Maximizar">
+        <svg width="12" height="12" viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+      </button>
+      <button id="btn-close" class="titlebar-btn titlebar-close" title="Fechar">
+        <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== SPLASH ==================== -->
+  <div id="splash"></div>
+
+  <!-- ==================== HOME ==================== -->
+  <canvas id="ascii-bg"></canvas>
+  <div id="screen-home" class="screen active">
+    <div class="center-panel">
+      <h1 class="brand">telinha</h1>
+      <p class="subtitle">// compartilhe sua tela em tempo real</p>
+      <div class="btn-group">
+        <button id="btn-transmit" class="btn primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          TRANSMITIR
+        </button>
+        <button id="btn-watch" class="btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          ASSISTIR AMIGUINHO
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== QUALIDADE ==================== -->
+  <div id="screen-quality" class="screen">
+    <div class="center-panel">
+      <h2 class="panel-title">Qualidade da transmissão</h2>
+      <p class="subtitle">// escolha a resolução e framerate</p>
+
+      <div class="quality-section">
+        <div class="config-label">RESOLUÇÃO</div>
+        <div class="option-row">
+          <button class="option active" data-key="resolution" data-value="1080">1080P</button>
+          <button class="option" data-key="resolution" data-value="720">720P</button>
+        </div>
+      </div>
+
+      <div class="quality-section">
+        <div class="config-label">FRAMERATE</div>
+        <div class="option-row">
+          <button class="option" data-key="fps" data-value="60">60 FPS</button>
+          <button class="option active" data-key="fps" data-value="30">30 FPS</button>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button id="btn-quality-confirm" class="btn primary">CONTINUAR</button>
+        <button id="btn-quality-back" class="btn ghost">VOLTAR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SELECIONAR FONTE ==================== -->
+  <div id="screen-source" class="screen">
+    <div class="center-panel wide">
+      <h2 class="panel-title">Escolha o que transmitir</h2>
+
+      <div class="source-list" id="source-list"></div>
+
+      <div class="option-section">
+        <label class="toggle-label">
+          <input type="checkbox" id="chk-audio" checked />
+          <span class="toggle-switch"></span>
+          Transmitir áudio
+        </label>
+      </div>
+
+      <div class="btn-group">
+        <button id="btn-start-share" class="btn primary" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          TRANSMITIR
+        </button>
+        <button id="btn-source-back" class="btn ghost">VOLTAR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TRANSMITINDO ==================== -->
+  <div id="screen-broadcast" class="screen">
+    <div class="broadcast-layout">
+      <div class="broadcast-preview">
+        <video id="broadcast-video" autoplay playsinline muted></video>
+        <div class="live-indicator">
+          <span class="live-dot"></span> AO VIVO
+        </div>
+        <div class="quality-badge" id="broadcast-quality-badge">1080p 30fps</div>
+      </div>
+      <div class="broadcast-menu">
+        <p class="broadcast-label">Sua transmissão</p>
+        <div class="code-display" id="broadcast-code">----</div>
+        <p class="hint">Compartilhe este código<br/>com a pessoa que assistirá</p>
+        <p class="timer" id="broadcast-timer">00:00</p>
+        <div id="broadcast-stats" class="stats"></div>
+        <div class="btn-group">
+          <button id="btn-stop-share" class="btn danger">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>
+            PARAR TRANSMISSÃO
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ASSISTIR - ENTRAR CÓDIGO ==================== -->
+  <div id="screen-join" class="screen">
+    <div class="center-panel">
+      <h2 class="panel-title">Assistir transmissão</h2>
+      <p class="subtitle">Digite o código de 4 dígitos</p>
+      <input type="text" id="join-code-input" class="code-input" maxlength="4" placeholder="----" inputmode="numeric" autocomplete="off" />
+      <div id="join-status" class="status-msg hidden"></div>
+      <div class="btn-group">
+        <button id="btn-join-connect" class="btn primary" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          CONECTAR
+        </button>
+        <button id="btn-join-back" class="btn ghost">VOLTAR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ASSISTINDO - VIDEO ==================== -->
+  <div id="screen-viewer" class="screen">
+    <div class="viewer-wrapper">
+      <video id="viewer-video" autoplay playsinline></video>
+      <div class="live-badge" id="viewer-badge">
+        <span class="live-dot"></span> LIVE <span id="viewer-badge-timer">00:00</span>
+      </div>
+      <div class="quality-badge viewer-quality-badge" id="viewer-quality-badge">--</div>
+      <div class="viewer-status" id="viewer-status">
+        <span class="spinner"></span> Conectando...
+      </div>
+      <div class="viewer-controls" id="viewer-controls">
+        <div class="ctrl-buttons">
+          <button id="btn-volume" class="ctrl-btn" title="Volume">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+          </button>
+          <input type="range" id="volume-slider" min="0" max="100" value="80" class="volume-slider" />
+          <button id="btn-fullscreen" class="ctrl-btn" title="Tela cheia">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
+          </button>
+          <button id="btn-leave" class="ctrl-btn leave" title="Encerrar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="renderer.js"></script>
+  <script src="ascii-bg.js"></script>
+</body>
+</html>

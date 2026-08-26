@@ -1,13 +1,45 @@
 {
-  "name": "screen-share",
+  "name": "telinha",
   "version": "1.0.0",
-  "description": "Compartilhamento de tela Full HD 60fps via WebRTC",
-  "main": "server.js",
+  "description": "Screen sharing desktop app via WebRTC",
+  "main": "main.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:dir": "electron-builder --win --dir"
   },
-  "dependencies": {
-    "express": "^4.19.2",
-    "ws": "^8.18.0"
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^33.4.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.telinha.app",
+    "productName": "telinha",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "electron/favicon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "telinha"
+    }
   }
 }
