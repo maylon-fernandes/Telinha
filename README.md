@@ -1,5 +1,7 @@
 # Telinha
 
+<img width="270" height="70" alt="image" src="https://github.com/user-attachments/assets/89f65fa5-7748-4420-90bb-08698dd9246a" />
+
 Compartilhe sua tela com amigos de graça, sem servidor, sem complicação.
 
 <br>
