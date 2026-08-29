@@ -486,8 +486,19 @@
       const ctx = canvas.getContext("2d");
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, 2, 2);
-      const dummyTrack = canvas.captureStream(1).getVideoTracks()[0];
-      const dummyStream = new MediaStream([dummyTrack]);
+      const dummyVideoTrack = canvas.captureStream(1).getVideoTracks()[0];
+
+      const audioCtx = new AudioContext();
+      const dest = audioCtx.createMediaStreamDestination();
+      const silentSource = audioCtx.createBufferSource();
+      const buffer = audioCtx.createBuffer(1, 1, 44100);
+      silentSource.buffer = buffer;
+      silentSource.loop = true;
+      silentSource.connect(dest);
+      silentSource.start();
+      const dummyAudioTrack = dest.stream.getAudioTracks()[0];
+
+      const dummyStream = new MediaStream([dummyVideoTrack, dummyAudioTrack]);
 
       const call = viewerPeer.call(code, dummyStream);
 
@@ -495,7 +506,9 @@
         showJoinError("Código inválido ou transmissão não encontrada.");
         viewerPeer.destroy();
         viewerPeer = null;
-        dummyTrack.stop();
+        dummyVideoTrack.stop();
+        dummyAudioTrack.stop();
+        audioCtx.close();
         return;
       }
 
