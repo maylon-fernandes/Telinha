@@ -46,7 +46,11 @@ app.whenReady().then(() => {
     mainWindow?.webContents.toggleDevTools();
   });
 
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error("checkForUpdates failed:", err);
+    });
+  }, 3000);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
