@@ -6,6 +6,12 @@ let mainWindow = null;
 
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.forceDevUpdateConfig = false;
+autoUpdater.setFeedURL({
+  provider: "github",
+  owner: "maylon-fernandes",
+  repo: "Telinha",
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -70,7 +76,9 @@ autoUpdater.on("update-downloaded", () => {
   }
 });
 
-autoUpdater.on("error", () => {});
+autoUpdater.on("error", (err) => {
+  console.error("AutoUpdater error:", err);
+});
 
 ipcMain.on("win-minimize", () => mainWindow?.minimize());
 ipcMain.on("win-maximize", () => {
