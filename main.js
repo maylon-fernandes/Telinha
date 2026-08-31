@@ -4,22 +4,6 @@ const { autoUpdater } = require("electron-updater");
 
 let mainWindow = null;
 
-autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = true;
-autoUpdater.forceDevUpdateConfig = false;
-autoUpdater.disableDifferentialDownload = true;
-autoUpdater.logger = {
-  info: (msg) => console.log("[updater]", msg),
-  warn: (msg) => console.warn("[updater]", msg),
-  error: (msg) => console.error("[updater]", msg),
-  debug: () => {},
-};
-autoUpdater.setFeedURL({
-  provider: "github",
-  owner: "maylon-fernandes",
-  repo: "Telinha",
-});
-
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -53,11 +37,62 @@ app.whenReady().then(() => {
     mainWindow?.webContents.toggleDevTools();
   });
 
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.forceDevUpdateConfig = false;
+  autoUpdater.disableDifferentialDownload = true;
+  autoUpdater.logger = {
+    info: (msg) => console.log("[updater]", msg),
+    warn: (msg) => console.warn("[updater]", msg),
+    error: (msg) => console.error("[updater]", msg),
+    debug: () => {},
+  };
+  autoUpdater.setFeedURL({
+    provider: "github",
+    owner: "maylon-fernandes",
+    repo: "Telinha",
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    console.log("[updater] Update available:", info.version);
+    if (mainWindow) {
+      mainWindow.webContents.send("update-status", "available", info.version);
+    }
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    console.log("[updater] Download progress:", Math.round(progress.percent) + "%");
+    if (mainWindow) {
+      mainWindow.webContents.send("update-status", "downloading", Math.round(progress.percent));
+    }
+  });
+
+  autoUpdater.on("update-downloaded", () => {
+    console.log("[updater] Update downloaded");
+    if (mainWindow) {
+      mainWindow.webContents.send("update-status", "downloaded");
+    }
+  });
+
+  autoUpdater.on("error", (err) => {
+    console.error("[updater] Error:", err.message);
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    console.log("[updater] No update available");
+  });
+
+  autoUpdater.on("checking-for-update", () => {
+    console.log("[updater] Checking for updates...");
+  });
+
   setTimeout(() => {
+    console.log("[updater] Starting update check...");
+    console.log("[updater] Current version:", app.getVersion());
     autoUpdater.checkForUpdates().catch((err) => {
-      console.error("checkForUpdates failed:", err);
+      console.error("[updater] checkForUpdates failed:", err.message);
     });
-  }, 3000);
+  }, 5000);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -67,36 +102,6 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   globalShortcut.unregisterAll();
   app.quit();
-});
-
-autoUpdater.on("update-available", (info) => {
-  if (mainWindow) {
-    mainWindow.webContents.send("update-status", "available", info.version);
-  }
-});
-
-autoUpdater.on("download-progress", (progress) => {
-  if (mainWindow) {
-    mainWindow.webContents.send("update-status", "downloading", Math.round(progress.percent));
-  }
-});
-
-autoUpdater.on("update-downloaded", () => {
-  if (mainWindow) {
-    mainWindow.webContents.send("update-status", "downloaded");
-  }
-});
-
-autoUpdater.on("error", (err) => {
-  console.error("AutoUpdater error:", err);
-});
-
-autoUpdater.on("update-not-available", () => {
-  console.log("[updater] No update available");
-});
-
-autoUpdater.on("checking-for-update", () => {
-  console.log("[updater] Checking for updates...");
 });
 
 ipcMain.on("win-minimize", () => mainWindow?.minimize());
