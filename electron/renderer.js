@@ -739,6 +739,10 @@
     showScreen("home");
     listenForUpdates();
 
+    window.electronAPI.getAppVersion().then((v) => {
+      $("version-label").textContent = "v" + v;
+    });
+
     const splash = document.getElementById("splash");
     if (splash) {
       gsap.to(splash, {

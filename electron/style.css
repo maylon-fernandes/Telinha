@@ -201,6 +201,17 @@ body {
 
 .hidden { display: none !important; }
 
+/* ===== Version label ===== */
+
+.version-label {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+
 .panel-title {
   font-size: 16px;
   font-weight: 700;
