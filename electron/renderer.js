@@ -737,6 +737,7 @@
 
   function init() {
     showScreen("home");
+    listenForUpdates();
 
     const splash = document.getElementById("splash");
     if (splash) {
@@ -748,6 +749,30 @@
         onComplete: () => splash.remove(),
       });
     }
+  }
+
+  function listenForUpdates() {
+    const indicator = $("update-indicator");
+    const updateText = $("update-text");
+    const updateBtn = $("btn-update");
+
+    if (!window.electronAPI?.onUpdateStatus) return;
+
+    window.electronAPI.onUpdateStatus((event, status, data) => {
+      indicator.classList.remove("hidden");
+      updateBtn.classList.add("hidden");
+
+      if (status === "available") {
+        updateText.textContent = `Versão ${data} disponível — baixando...`;
+      } else if (status === "downloading") {
+        updateText.textContent = `Baixando update... ${data}%`;
+      } else if (status === "downloaded") {
+        updateText.textContent = "Update pronto!";
+        updateBtn.classList.remove("hidden");
+        updateBtn.textContent = "REINICIAR";
+        updateBtn.onclick = () => window.electronAPI.installUpdate();
+      }
+    });
   }
 
   init();

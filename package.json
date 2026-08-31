@@ -1,6 +1,6 @@
 {
   "name": "telinha",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Screen sharing desktop app via WebRTC",
   "main": "main.js",
   "scripts": {
@@ -8,7 +8,9 @@
     "build": "electron-builder --win",
     "build:dir": "electron-builder --win --dir"
   },
-  "dependencies": {},
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
   "devDependencies": {
     "electron": "^33.4.0",
     "electron-builder": "^25.1.8"
@@ -40,6 +42,11 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "telinha"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "maylon-fernandes",
+      "repo": "Telinha"
     }
   }
 }

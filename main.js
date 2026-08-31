@@ -1,7 +1,11 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, Menu, globalShortcut } = require("electron");
+const { app, BrowserWindow, ipcMain, desktopCapturer, Menu, globalShortcut, shell } = require("electron");
 const path = require("path");
+const { autoUpdater } = require("electron-updater");
 
 let mainWindow = null;
+
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -36,6 +40,8 @@ app.whenReady().then(() => {
     mainWindow?.webContents.toggleDevTools();
   });
 
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -46,12 +52,33 @@ app.on("window-all-closed", () => {
   app.quit();
 });
 
+autoUpdater.on("update-available", (info) => {
+  if (mainWindow) {
+    mainWindow.webContents.send("update-status", "available", info.version);
+  }
+});
+
+autoUpdater.on("download-progress", (progress) => {
+  if (mainWindow) {
+    mainWindow.webContents.send("update-status", "downloading", Math.round(progress.percent));
+  }
+});
+
+autoUpdater.on("update-downloaded", () => {
+  if (mainWindow) {
+    mainWindow.webContents.send("update-status", "downloaded");
+  }
+});
+
+autoUpdater.on("error", () => {});
+
 ipcMain.on("win-minimize", () => mainWindow?.minimize());
 ipcMain.on("win-maximize", () => {
   if (mainWindow?.isMaximized()) mainWindow.unmaximize();
   else mainWindow?.maximize();
 });
 ipcMain.on("win-close", () => mainWindow?.close());
+ipcMain.on("install-update", () => autoUpdater.quitAndInstall());
 
 ipcMain.handle("get-desktop-sources", async () => {
   try {
@@ -71,3 +98,6 @@ ipcMain.handle("get-desktop-sources", async () => {
     return [];
   }
 });
+
+ipcMain.handle("get-app-version", () => app.getVersion());
+ipcMain.handle("open-external", (_, url) => shell.openExternal(url));
