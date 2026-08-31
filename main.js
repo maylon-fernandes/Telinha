@@ -7,6 +7,13 @@ let mainWindow = null;
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 autoUpdater.forceDevUpdateConfig = false;
+autoUpdater.disableDifferentialDownload = true;
+autoUpdater.logger = {
+  info: (msg) => console.log("[updater]", msg),
+  warn: (msg) => console.warn("[updater]", msg),
+  error: (msg) => console.error("[updater]", msg),
+  debug: () => {},
+};
 autoUpdater.setFeedURL({
   provider: "github",
   owner: "maylon-fernandes",
@@ -82,6 +89,14 @@ autoUpdater.on("update-downloaded", () => {
 
 autoUpdater.on("error", (err) => {
   console.error("AutoUpdater error:", err);
+});
+
+autoUpdater.on("update-not-available", () => {
+  console.log("[updater] No update available");
+});
+
+autoUpdater.on("checking-for-update", () => {
+  console.log("[updater] Checking for updates...");
 });
 
 ipcMain.on("win-minimize", () => mainWindow?.minimize());
