@@ -1,6 +1,6 @@
 {
   "name": "telinha",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Screen sharing desktop app via WebRTC",
   "main": "main.js",
   "scripts": {
